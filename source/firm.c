@@ -108,6 +108,65 @@ void patchFirm(){
     fclose();
 }
 
+void patchTwlAgbFirm(){
+    u32 firmType,
+        console;
+
+    //Detect the console being used
+    console = (PDN_MPCORE_CFG == 1) ? 0 : 1;
+
+    //Determine if this is a firmlaunch boot
+    if(*(vu8 *)0x23F00005){
+        //'0' = NATIVE_FIRM, '1' = TWL_FIRM, '2' = AGB_FIRM
+        firmType = *(vu8 *)0x23F00005 - '0';
+    } else {
+        firmType = 0;
+    }
+    //On N3DS, decrypt ARM9Bin and patch ARM9 entrypoint to skip arm9loader
+    if(console)
+    {
+        arm9Loader((u8 *)firm + section[3].offset, 0);
+        firm->arm9Entry = (u8 *)0x801301C;
+    }
+
+    const patchData twlPatches[] = {
+        {{0x1650C0, 0x165D64}, {{ 6, 0x00, 0x20, 0x4E, 0xB0, 0x70, 0xBD }}, 0},
+        {{0x173A0E, 0x17474A}, { .type1 = 0x2001 }, 1},
+        {{0x174802, 0x17553E}, { .type1 = 0x2000 }, 2},
+        {{0x174964, 0x1756A0}, { .type1 = 0x2000 }, 2},
+        {{0x174D52, 0x175A8E}, { .type1 = 0x2001 }, 2},
+        {{0x174D5E, 0x175A9A}, { .type1 = 0x2001 }, 2},
+        {{0x174D6A, 0x175AA6}, { .type1 = 0x2001 }, 2},
+        {{0x174E56, 0x175B92}, { .type1 = 0x2001 }, 1},
+        {{0x174E58, 0x175B94}, { .type1 = 0x4770 }, 1}
+    },
+    agbPatches[] = {
+        {{0x9D2A8, 0x9DF64}, {{ 6, 0x00, 0x20, 0x4E, 0xB0, 0x70, 0xBD }}, 0},
+        {{0xD7A12, 0xD8B8A}, { .type1 = 0xEF26 }, 1}
+    };
+
+    /* Calculate the amount of patches to apply. Only count the boot screen patch for AGB_FIRM
+       if the matching option was enabled (keep it as last) */
+    u32 numPatches = firmType == 1 ? (sizeof(twlPatches) / sizeof(patchData)) : (sizeof(agbPatches) / sizeof(patchData));
+    const patchData *patches = firmType == 1 ? twlPatches : agbPatches;
+
+    //Patch
+    for(u32 i = 0; i < numPatches; i++)
+    {
+        switch(patches[i].type)
+        {
+            case 0:
+                memcpy((u8 *)firm + patches[i].offset[console], patches[i].patch.type0 + 1, patches[i].patch.type0[0]);
+                break;
+            case 2:
+                *(u16 *)((u8 *)firm + patches[i].offset[console] + 2) = 0;
+            case 1:
+                *(u16 *)((u8 *)firm + patches[i].offset[console]) = patches[i].patch.type1;
+                break;
+        }
+    }
+}
+
 void launchFirm(void){
     //Copy firm partitions to respective memory locations
     memcpy(section[0].address, firmLocation + section[0].offset, section[0].size);

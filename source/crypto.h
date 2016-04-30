@@ -80,6 +80,7 @@
 
 //NAND/FIRM stuff
 void k9loader(void *armHdr);
+void arm9Loader(u8 *arm9Section, u32 mode);
 void decryptFirm(void *firm, Size firmSize);
 
 #endif /*__CRYPTO_H*/

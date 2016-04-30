@@ -14,6 +14,7 @@ int main(){
     loadSplash();
     loadFirm();
     patchFirm();
+    patchTwlAgbFirm();
     launchFirm();
     return 0;
 }
